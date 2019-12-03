@@ -126,12 +126,12 @@ class Controller(object):
         # add offset to current marker pose to draw Lissajous figure in x-y-plane of marker
         target = numpy.copy(self.im_server.target)
         target[0:3, 3] += target[0:3, 0:3].dot(offset)
-        self.position_control(target)
+        self.pose_control(target)
 
 
 rospy.init_node('ik')
 c = Controller()
 rate = rospy.Rate(50)
 while not rospy.is_shutdown():
-    c.pose_control(c.im_server.target)
+    c.lissajous()
     rate.sleep()

@@ -67,6 +67,8 @@ class Gui(QWidget):
 
         ns_old = numpy.zeros((c.N, 0))
         while not rospy.is_shutdown():
+            tasks = []
+            ineq_tasks = []
             if task == 0:  # position + orientation control
                 tasks = [c.pose_task(c.targets['pose'], c.T)]
             elif task >= 1 and task <= 4:
@@ -86,7 +88,8 @@ class Gui(QWidget):
                 if task == 3:  # using parallel_axes_task
                     tasks.append(c.parallel_axes_task(numpy.array([0, 1, 0]), normal))
                 elif task == 4:  # using cone_task
-                    tasks.append(c.cone_task(numpy.array([0, 1, 0]), normal, threshold=1.0))
+                    ineq_tasks = [c.cone_task(numpy.array([0, 1, 0]), normal, threshold=0.95)]
+
             elif task >= 5 and task <= 6:  # constrain position
                 J, e = c.position_task(c.targets['pos'], c.T)
                 lb_violated, ub_violated = (-tol > e), (e > tol)
@@ -97,12 +100,16 @@ class Gui(QWidget):
                 clipped[ub_violated] -= tol[ub_violated]
                 # if error violates box constraint, move into box via equality task and clipped error
                 tasks = [(J[violated], clipped[violated])]
+                # otherwise constrain motion to stay within tolerance box
+                satisfied = numpy.logical_not(violated)
+                J, lb, ub = J[satisfied], (-tol-e)[satisfied], (tol-e)[satisfied]
+                ineq_tasks = [(-J, -lb), (J, ub)]
                 if task == 6:  # additionally constrain orientation to cone
                     axis = numpy.array([0, 0, 1])  # cone axis along world's z-axis
-                    tasks.append(c.cone_task(numpy.array([0, 1, 0]), axis, threshold=1.0))
+                    ineq_tasks.append(c.cone_task(numpy.array([0, 1, 0]), axis, threshold=0.95))
 
-            self.showErrors(tasks)
-            q_delta = c.solve(tasks)
+            self.showErrors(tasks + ineq_tasks)
+            q_delta = c.solve_qp(tasks, ineq_tasks)
 
             # nullspace control
             N = c.nullspace.shape[1]  # dimensionality of nullspace

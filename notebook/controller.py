@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import numpy
+import qpsolvers
 import rospy
 import random
 from std_msgs.msg import Header, ColorRGBA
@@ -113,6 +114,21 @@ class Controller(object):
             N = VN.dot(VN.T)
         self.nullspace = VN  # remember nullspace basis
         return qdot
+
+    def solve_qp(self, equality_tasks, inequality_tasks):
+        """Solve tasks of the form J dq = e  and  J dq ≤ e
+           using quadratic optimization: https://pypi.org/project/qpsolvers"""
+        # combine all equality/inequality tasks into single matrices
+        P = numpy.identity(self.N)  # minimize joint velocity
+        q = numpy.zeros(self.N)
+        A, b = self.stack(equality_tasks) if equality_tasks else (None, None)
+        G, h = self.stack(inequality_tasks) if inequality_tasks else (None, None)
+        self.nullspace = numpy.zeros((self.N, 0))
+        try:
+            return qpsolvers.solve_qp(P, q, G, h, A, b)
+        except ValueError as e:
+            print(e)
+            return numpy.zeros(self.N)
 
     @staticmethod
     def stack(tasks):

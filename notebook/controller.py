@@ -123,9 +123,11 @@ class Controller(object):
         q = numpy.zeros(self.N)
         A, b = self.stack(equality_tasks) if equality_tasks else (None, None)
         G, h = self.stack(inequality_tasks) if inequality_tasks else (None, None)
+        lb = numpy.maximum(-0.1, self.mins - self.joint_msg.position)
+        ub = numpy.minimum(0.1, self.maxs - self.joint_msg.position)
         self.nullspace = numpy.zeros((self.N, 0))
         try:
-            return qpsolvers.solve_qp(P, q, G, h, A, b)
+            return qpsolvers.solve_qp(P, q, G, h, A, b, lb, ub)
         except ValueError as e:
             print(e)
             return numpy.zeros(self.N)
